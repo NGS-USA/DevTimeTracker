@@ -1,0 +1,78 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0c1018;
+  --surface: #141824;
+  --surface2: #1b2133;
+  --border: #252d42;
+  --accent: #20d4a0;
+  --text: #e2e8f8;
+  --muted: #4e5a7a;
+  --danger: #f0566c;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', -apple-system, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+select, input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  outline: none;
+  padding: 9px 12px;
+  transition: border-color 0.15s;
+}
+
+select:focus, input:focus {
+  border-color: var(--accent);
+}
+
+select option {
+  background: var(--surface2);
+}
+
+select:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { text-shadow: 0 0 20px rgba(32, 212, 160, 0.25); }
+  50%       { text-shadow: 0 0 50px rgba(32, 212, 160, 0.6); }
+}
+
+@keyframes blink-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.timer-running {
+  animation: pulse-glow 1.8s ease-in-out infinite;
+}
+
+.rec-dot {
+  display: inline-block;
+  animation: blink-dot 1.2s ease-in-out infinite;
+}
+
+.fade-in {
+  animation: fade-in 0.2s ease;
+}
