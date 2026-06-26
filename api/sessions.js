@@ -21,13 +21,12 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const { projectId } = req.query
-      let url = `${base}/?user_field_names=true&size=200&order_by=-id`
-      const r = await fetch(url, {
+      const r = await fetch(`${base}/?user_field_names=true&size=200&order_by=-id`, {
         headers: { Authorization: `Token ${token}` },
       })
       const data = await r.json()
       const sessions = (data.results || [])
-        .filter(row => !projectId || row.ProjectID === projectId)
+        .filter(row => !projectId || String(row.ProjectID) === String(projectId))
         .map(row => ({
           id:        String(row.id),
           projectId: row.ProjectID,
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
           startTime: row.StartTime,
           endTime:   row.EndTime,
           duration:  parseInt(row.Duration || 0),
-          note:      row.Note || '',
+          note:      row.Notes || '',
         }))
       return res.status(200).json(sessions)
     }
@@ -51,7 +50,7 @@ export default async function handler(req, res) {
           StartTime: body.startTime,
           EndTime:   body.endTime,
           Duration:  body.duration,
-          Note:      body.note || '',
+          Notes:     body.note || '',
         }),
       })
       const data = await r.json()
@@ -62,7 +61,7 @@ export default async function handler(req, res) {
         startTime: data.StartTime,
         endTime:   data.EndTime,
         duration:  parseInt(data.Duration || 0),
-        note:      data.Note || '',
+        note:      data.Notes || '',
       })
     }
 
