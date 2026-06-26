@@ -6,17 +6,17 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const { clientId } = req.query
-      let url = `${base}/?user_field_names=true&size=200&order_by=Name`
-      if (clientId) url += `&filter__ClientID__equal=${clientId}`
-      const r = await fetch(url, {
+      const r = await fetch(`${base}/?user_field_names=true&size=200&order_by=Name`, {
         headers: { Authorization: `Token ${token}` },
       })
       const data = await r.json()
-      const projects = (data.results || []).map(row => ({
-        id:       String(row.id),
-        clientId: row.ClientID,
-        name:     row.Name,
-      }))
+      const projects = (data.results || [])
+        .filter(row => !clientId || row.ClientID === clientId)
+        .map(row => ({
+          id:       String(row.id),
+          clientId: row.ClientID,
+          name:     row.Name,
+        }))
       return res.status(200).json(projects)
     }
 
