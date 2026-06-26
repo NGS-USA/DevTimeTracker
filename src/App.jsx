@@ -166,27 +166,30 @@ const S = {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [clients, setClients]             = useState([])
-  const [projects, setProjects]           = useState([])
-  const [sessions, setSessions]           = useState([])
-  const [clientId, setClientId]           = useState('')
-  const [projectId, setProjectId]         = useState('')
-  const [running, setRunning]             = useState(false)
-  const [elapsed, setElapsed]             = useState(0)
-  const [startTs, setStartTs]             = useState(null)
-  const [note, setNote]                   = useState('')
-  const [modal, setModal]                 = useState(null)
-  const [newName, setNewName]             = useState('')
-  const [deleteId, setDeleteId]           = useState(null)
-  const [toast, setToast]                 = useState(null)
-  const [loadingClients, setLoadingClients] = useState(true)
+  // Restore last selected client/project from localStorage so a refresh doesn't wipe the selection
+  const [clients, setClients]   = useState([])
+  const [projects, setProjects] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [clientId, setClientId] = useState(() => localStorage.getItem('dt:clientId') || '')
+  const [projectId, setProjectId] = useState(() => localStorage.getItem('dt:projectId') || '')
+  const [running, setRunning]   = useState(false)
+  const [elapsed, setElapsed]   = useState(0)
+  const [startTs, setStartTs]   = useState(null)
+  const [note, setNote]         = useState('')
+  const [modal, setModal]       = useState(null)
+  const [newName, setNewName]   = useState('')
+  const [deleteId, setDeleteId] = useState(null)
+  const [toast, setToast]       = useState(null)
+  const [loadingClients, setLoadingClients]   = useState(true)
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [loadingSessions, setLoadingSessions] = useState(false)
-  const [submitting, setSubmitting]       = useState(false)
-  const [error, setError]                 = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError]       = useState(null)
   const timerRef = useRef(null)
+  // Tracks whether the projects effect is running for the first time (initial page load)
+  // so we don't wipe the restored projectId from localStorage on mount
+  const isInitialClientLoad = useRef(true)
 
-  // Add spin keyframe
   useEffect(() => {
     const style = document.createElement('style')
     style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`
@@ -194,34 +197,48 @@ export default function App() {
     return () => document.head.removeChild(style)
   }, [])
 
-  // Load clients on mount
+  // Load all clients once on mount
   useEffect(() => {
     apiFetch('/api/clients')
       .then(data => { setClients(data); setError(null) })
-      .catch(err => setError('Could not connect to database. Check your environment variables.'))
+      .catch(() => setError('Could not connect to database. Check your environment variables.'))
       .finally(() => setLoadingClients(false))
   }, [])
 
-  // Load projects when client changes
+  // Load projects whenever clientId changes.
+  // Uses a `cancelled` flag to prevent a slow response from a previous client
+  // overwriting the results for the current client (race condition fix).
   useEffect(() => {
     if (!clientId) { setProjects([]); return }
+
+    // On the very first load we keep the projectId restored from localStorage.
+    // On every subsequent client switch we clear it.
+    if (!isInitialClientLoad.current) {
+      setProjectId('')
+      setSessions([])
+      localStorage.removeItem('dt:projectId')
+    }
+    isInitialClientLoad.current = false
+
+    let cancelled = false
     setLoadingProjects(true)
-    setProjectId('')
-    setSessions([])
     apiFetch(`/api/projects?clientId=${clientId}`)
-      .then(data => setProjects(data))
-      .catch(() => showToast('Failed to load projects', true))
-      .finally(() => setLoadingProjects(false))
+      .then(data  => { if (!cancelled) setProjects(data) })
+      .catch(()   => { if (!cancelled) showToast('Failed to load projects', true) })
+      .finally(() => { if (!cancelled) setLoadingProjects(false) })
+    return () => { cancelled = true }
   }, [clientId])
 
-  // Load sessions when project changes
+  // Load sessions whenever projectId changes (same race condition guard)
   useEffect(() => {
     if (!projectId) { setSessions([]); return }
+    let cancelled = false
     setLoadingSessions(true)
     apiFetch(`/api/sessions?projectId=${projectId}`)
-      .then(data => setSessions(data))
-      .catch(() => showToast('Failed to load sessions', true))
-      .finally(() => setLoadingSessions(false))
+      .then(data  => { if (!cancelled) setSessions(data) })
+      .catch(()   => { if (!cancelled) showToast('Failed to load sessions', true) })
+      .finally(() => { if (!cancelled) setLoadingSessions(false) })
+    return () => { cancelled = true }
   }, [projectId])
 
   // Timer tick
@@ -258,8 +275,14 @@ export default function App() {
 
   function changeClient(id) {
     setClientId(id)
-    setProjectId('')
-    setSessions([])
+    localStorage.setItem('dt:clientId', id)
+    // projectId and sessions are cleared by the useEffect above
+  }
+
+  function changeProject(id) {
+    setProjectId(id)
+    if (id) localStorage.setItem('dt:projectId', id)
+    else localStorage.removeItem('dt:projectId')
   }
 
   function startTimer() {
@@ -309,9 +332,7 @@ export default function App() {
     try {
       const client = await apiFetch('/api/clients', { method: 'POST', body: { name: newName.trim() } })
       setClients(prev => [...prev, client])
-      setClientId(client.id)
-      setProjectId('')
-      setSessions([])
+      changeClient(client.id)
       setNewName('')
       setModal(null)
     } catch {
@@ -324,8 +345,7 @@ export default function App() {
     try {
       const project = await apiFetch('/api/projects', { method: 'POST', body: { name: newName.trim(), clientId } })
       setProjects(prev => [...prev, project])
-      setProjectId(project.id)
-      setSessions([])
+      changeProject(project.id)
       setNewName('')
       setModal(null)
     } catch {
@@ -355,12 +375,9 @@ export default function App() {
       title = `${currentClient.name} — ${currentProject.name}`
       breakdown = null
     } else {
-      const allClientSessions = [] // can't export all sessions without fetching per-project
-      // For client export we use current sessions grouped by project
-      const clientProjects = projects.filter(p => p.clientId === clientId)
       exportSessions = sessions
       title = `${currentClient.name} — All Projects`
-      breakdown = clientProjects.map(p => ({
+      breakdown = projects.map(p => ({
         name: p.name,
         sessions: sessions.filter(s => s.projectId === p.id),
         total: sessions.filter(s => s.projectId === p.id).reduce((a, s) => a + s.duration, 0),
@@ -371,7 +388,7 @@ export default function App() {
     openPDFWindow(buildPDF(title, exportSessions, breakdown))
   }
 
-  // ── Loading Screen ────────────────────────────────────────────────────────
+  // ── Loading / Error screens ───────────────────────────────────────────────
 
   if (loadingClients) {
     return (
@@ -409,7 +426,7 @@ export default function App() {
         <select
           style={{ minWidth: 170 }}
           value={projectId}
-          onChange={e => setProjectId(e.target.value)}
+          onChange={e => changeProject(e.target.value)}
           disabled={!clientId || loadingProjects}
         >
           <option value="">{loadingProjects ? 'Loading…' : 'Select project…'}</option>
