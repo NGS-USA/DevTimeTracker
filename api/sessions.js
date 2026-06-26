@@ -20,22 +20,21 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const { projectId } = req.query
+      // Return all sessions — filtering is done client-side in App.jsx
+      // This avoids any server-side type mismatch issues with Baserow field values
       const r = await fetch(`${base}/?user_field_names=true&size=200&order_by=-id`, {
         headers: { Authorization: `Token ${token}` },
       })
       const data = await r.json()
-      const sessions = (data.results || [])
-        .filter(row => !projectId || String(row.ProjectID) === String(projectId))
-        .map(row => ({
-          id:        String(row.id),
-          projectId: row.ProjectID,
-          clientId:  row.ClientID,
-          startTime: row.StartTime,
-          endTime:   row.EndTime,
-          duration:  parseInt(row.Duration || 0),
-          note:      row.Notes || '',
-        }))
+      const sessions = (data.results || []).map(row => ({
+        id:        String(row.id),
+        projectId: String(row.ProjectID || ''),
+        clientId:  String(row.ClientID  || ''),
+        startTime: row.StartTime,
+        endTime:   row.EndTime,
+        duration:  parseInt(row.Duration || 0),
+        note:      row.Notes || '',
+      }))
       return res.status(200).json(sessions)
     }
 
@@ -56,8 +55,8 @@ export default async function handler(req, res) {
       const data = await r.json()
       return res.status(r.status).json({
         id:        String(data.id),
-        projectId: data.ProjectID,
-        clientId:  data.ClientID,
+        projectId: String(data.ProjectID || ''),
+        clientId:  String(data.ClientID  || ''),
         startTime: data.StartTime,
         endTime:   data.EndTime,
         duration:  parseInt(data.Duration || 0),

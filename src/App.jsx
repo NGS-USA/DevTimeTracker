@@ -228,13 +228,18 @@ export default function App() {
     return () => { cancelled = true }
   }, [clientId])
 
-  // Load sessions when project changes
+  // Load sessions when project changes — filtered client-side for reliability
   useEffect(() => {
     if (!projectId) { setSessions([]); return }
     let cancelled = false
     setLoadingSessions(true)
-    apiFetch(`/api/sessions?projectId=${projectId}`)
-      .then(data  => { if (!cancelled) setSessions(data) })
+    apiFetch('/api/sessions')
+      .then(data => {
+        if (!cancelled) {
+          const filtered = (data || []).filter(s => String(s.projectId) === String(projectId))
+          setSessions(filtered)
+        }
+      })
       .catch(()   => { if (!cancelled) showToast('Failed to load sessions', true) })
       .finally(() => { if (!cancelled) setLoadingSessions(false) })
     return () => { cancelled = true }
