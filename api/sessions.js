@@ -1,3 +1,18 @@
+async function readBody(req) {
+  if (req.body !== undefined) {
+    return typeof req.body === 'string' ? JSON.parse(req.body) : req.body
+  }
+  return new Promise((resolve, reject) => {
+    let data = ''
+    req.on('data', chunk => { data += chunk })
+    req.on('end', () => {
+      try { resolve(data ? JSON.parse(data) : {}) }
+      catch { resolve({}) }
+    })
+    req.on('error', reject)
+  })
+}
+
 export default async function handler(req, res) {
   const token   = process.env.BASEROW_TOKEN
   const tableId = process.env.BASEROW_SESSIONS_TABLE_ID
@@ -7,25 +22,26 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const { projectId } = req.query
       let url = `${base}/?user_field_names=true&size=200&order_by=-id`
-      if (projectId) url += `&filter__ProjectID__equal=${projectId}`
       const r = await fetch(url, {
         headers: { Authorization: `Token ${token}` },
       })
       const data = await r.json()
-      const sessions = (data.results || []).map(row => ({
-        id:        String(row.id),
-        projectId: row.ProjectID,
-        clientId:  row.ClientID,
-        startTime: row.StartTime,
-        endTime:   row.EndTime,
-        duration:  parseInt(row.Duration || 0),
-        note:      row.Note || '',
-      }))
+      const sessions = (data.results || [])
+        .filter(row => !projectId || row.ProjectID === projectId)
+        .map(row => ({
+          id:        String(row.id),
+          projectId: row.ProjectID,
+          clientId:  row.ClientID,
+          startTime: row.StartTime,
+          endTime:   row.EndTime,
+          duration:  parseInt(row.Duration || 0),
+          note:      row.Note || '',
+        }))
       return res.status(200).json(sessions)
     }
 
     if (req.method === 'POST') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
+      const body = await readBody(req)
       const r = await fetch(`${base}/?user_field_names=true`, {
         method:  'POST',
         headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },

@@ -1,3 +1,18 @@
+async function readBody(req) {
+  if (req.body !== undefined) {
+    return typeof req.body === 'string' ? JSON.parse(req.body) : req.body
+  }
+  return new Promise((resolve, reject) => {
+    let data = ''
+    req.on('data', chunk => { data += chunk })
+    req.on('end', () => {
+      try { resolve(data ? JSON.parse(data) : {}) }
+      catch { resolve({}) }
+    })
+    req.on('error', reject)
+  })
+}
+
 export default async function handler(req, res) {
   const token   = process.env.BASEROW_TOKEN
   const tableId = process.env.BASEROW_PROJECTS_TABLE_ID
@@ -21,13 +36,15 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
+      const body = await readBody(req)
+      console.log('Creating project with body:', JSON.stringify(body))
       const r = await fetch(`${base}/?user_field_names=true`, {
         method:  'POST',
         headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },
         body:    JSON.stringify({ Name: body.name, ClientID: body.clientId }),
       })
       const data = await r.json()
+      console.log('Baserow response:', JSON.stringify(data))
       return res.status(r.status).json({
         id:       String(data.id),
         clientId: data.ClientID,
