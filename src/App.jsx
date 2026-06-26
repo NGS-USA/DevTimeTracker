@@ -236,13 +236,9 @@ export default function App() {
     apiFetch('/api/sessions')
       .then(data => {
         if (!cancelled) {
-          console.log('Sessions from API:', data)
-          console.log('Filtering for projectId:', projectId, typeof projectId)
-          const filtered = (data || []).filter(s => {
-            console.log('  session.projectId:', s.projectId, typeof s.projectId, '| match:', String(s.projectId) === String(projectId))
-            return String(s.projectId) === String(projectId)
-          })
-          console.log('Filtered result:', filtered)
+          const filtered = (data || [])
+            .filter(s => String(s.projectId) === String(projectId))
+            .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
           setSessions(filtered)
         }
       })

@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       // Return all sessions — filtering is done client-side in App.jsx
       // This avoids any server-side type mismatch issues with Baserow field values
-      const r = await fetch(`${base}/?user_field_names=true&size=200&order_by=-id`, {
+      const r = await fetch(`${base}/?user_field_names=true&size=200`, {
         headers: { Authorization: `Token ${token}` },
       })
       const data = await r.json()
